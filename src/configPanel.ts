@@ -198,10 +198,11 @@ function onProviderChange() {
   const urlInput = document.getElementById('apiBaseUrl');
   const urlHint = urlInput.nextElementSibling;
 
-  if (p.name.startsWith('Anthropic')) {
+  if (p.note) {
     urlInput.value = '';
-    urlInput.placeholder = 'Enter your proxy URL (Anthropic native API is not OpenAI-compatible)';
-    urlHint.textContent = '⚠️ Anthropic native API does NOT support OpenAI format. Use OpenRouter, or a proxy like one-api.';
+    urlInput.placeholder = 'Enter your proxy URL';
+    urlHint.innerHTML = p.note;
+    urlHint.style.color = 'var(--vscode-editorWarning-foreground, #CCA700)';
   } else if (p.name === 'Custom') {
     urlInput.value = '';
     urlInput.placeholder = 'https://your-proxy.com/v1';
