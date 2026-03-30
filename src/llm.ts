@@ -130,7 +130,7 @@ Examples: "✨ Add user search endpoint", "🔧 Fix null pointer in authenticati
 
   return `You are a git commit message generator. Output ONLY the commit message, nothing else. No explanations, no quotes.
 
-Language: ${lang}
+IMPORTANT: You MUST write the ENTIRE commit message in ${lang}. Every word must be in ${lang}. Do not use any English unless ${lang} is English.
 
 ${styleGuide}
 
