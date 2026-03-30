@@ -178,7 +178,7 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
   </div>
   <div class="field">
     <label>Message Format</label>
-    <select id="style" onchange="updatePreview()">
+    <select id="style">
       <option value="conventional"${style === 'conventional' ? ' selected' : ''}>Conventional (feat/fix/...)</option>
       <option value="simple"${style === 'simple' ? ' selected' : ''}>Natural Language</option>
       <option value="emoji"${style === 'emoji' ? ' selected' : ''}>Emoji Prefix (🔧/✨/...)</option>
@@ -187,7 +187,7 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
   </div>
   <div class="field">
     <label>Message Length</label>
-    <select id="detail" onchange="updatePreview()">
+    <select id="detail">
       <option value="concise"${detail === 'concise' ? ' selected' : ''}>One-line summary</option>
       <option value="detailed"${detail === 'detailed' ? ' selected' : ''}>Summary + body</option>
     </select>
@@ -266,6 +266,7 @@ function onProviderChange() {
 // Initialize
 onProviderChange();
 
+// Preview
 const PREVIEWS = {
   conventional: {
     concise: 'feat(auth): add login with Google OAuth',
@@ -287,6 +288,9 @@ function updatePreview() {
   const preview = PREVIEWS[s]?.[d] || '';
   document.getElementById('preview').textContent = preview;
 }
+
+document.getElementById('style').addEventListener('change', updatePreview);
+document.getElementById('detail').addEventListener('change', updatePreview);
 updatePreview();
 
 // If we have a custom model, try to select it or show it

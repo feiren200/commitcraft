@@ -93,7 +93,77 @@ export async function generateCommitMessage(
   // Remove markdown code block wrapper if present
   message = message.replace(/^```(?:\w*\n)?([\s\S]*?)```$/, '$1').trim();
 
+  // Post-process to enforce format
+  message = enforceFormat(message, config.style);
+
   return message;
+}
+
+/**
+ * Post-process commit message to enforce the selected style.
+ * Models don't always follow format instructions, so we enforce it here.
+ */
+function enforceFormat(message: string, style: string): string {
+  if (!message) return message;
+
+  const firstLine = message.split('\n')[0];
+
+  switch (style) {
+    case 'conventional': {
+      // Check if already has conventional prefix: type(scope): or type:
+      if (/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:\s/.test(firstLine)) {
+        return message; // Already formatted
+      }
+      // Try to detect type from content
+      const type = detectConventionalType(message);
+      return `${type}: ${message}`;
+    }
+    case 'emoji': {
+      // Check if already starts with an emoji
+      if (/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(firstLine)) {
+        return message;
+      }
+      // Detect type and prepend emoji
+      const emoji = detectEmoji(message);
+      return `${emoji} ${message}`;
+    }
+    case 'simple': {
+      // Strip any conventional prefix or emoji that leaked through
+      let clean = message.replace(/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:\s*/i, '');
+      clean = clean.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]\s*/u, '');
+      return clean;
+    }
+    default:
+      return message;
+  }
+}
+
+function detectConventionalType(message: string): string {
+  const lower = message.toLowerCase();
+  if (/\b(add|implement|create|new|feature|introduce)\b/.test(lower)) return 'feat';
+  if (/\b(fix|bug|resolve|patch|crash|error|issue)\b/.test(lower)) return 'fix';
+  if (/\b(refactor|restructure|reorganize|rewrite|clean.?up)\b/.test(lower)) return 'refactor';
+  if (/\b(doc|readme|comment|changelog)\b/.test(lower)) return 'docs';
+  if (/\b(test|spec|coverage|unit|e2e)\b/.test(lower)) return 'test';
+  if (/\b(style|format|lint|prettier|whitespace)\b/.test(lower)) return 'style';
+  if (/\b(perf|performance|optimize|speed|fast)\b/.test(lower)) return 'perf';
+  if (/\b(ci|pipeline|workflow|action|github)\b/.test(lower)) return 'ci';
+  if (/\b(build|webpack|vite|rollup|compile|bundle)\b/.test(lower)) return 'build';
+  return 'chore';
+}
+
+function detectEmoji(message: string): string {
+  const lower = message.toLowerCase();
+  if (/\b(add|implement|create|new|feature|introduce)\b/.test(lower)) return '✨';
+  if (/\b(fix|bug|resolve|patch|crash|error)\b/.test(lower)) return '🔧';
+  if (/\b(refactor|restructure|rewrite|clean.?up)\b/.test(lower)) return '♻️';
+  if (/\b(doc|readme|comment)\b/.test(lower)) return '📝';
+  if (/\b(test|spec|coverage)\b/.test(lower)) return '🧪';
+  if (/\b(style|format|lint)\b/.test(lower)) return '🎨';
+  if (/\b(perf|optimize|speed)\b/.test(lower)) return '⚡';
+  if (/\b(ci|pipeline|workflow)\b/.test(lower)) return '👷';
+  if (/\b(build|webpack|compile|bundle)\b/.test(lower)) return '🔨';
+  return '📝';
 }
 
 function buildSystemPrompt(config: {
