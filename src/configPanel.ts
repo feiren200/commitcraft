@@ -7,25 +7,34 @@ export function registerConfigPanel(context: vscode.ExtensionContext): vscode.Di
       'commitCraftConfig',
       'CommitCraft Settings',
       vscode.ViewColumn.One,
-      { enableScripts: true, retainContextWhenHidden: true }
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      }
     );
 
     const config = vscode.workspace.getConfiguration('commitCraft');
-    panel.webview.html = getWebviewContent(config);
+    panel.webview.html = getWebviewContent(panel.webview, config);
 
     panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'save') {
-        const cfg = vscode.workspace.getConfiguration('commitCraft');
-        for (const [key, value] of Object.entries(msg.data)) {
-          await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+        try {
+          const cfg = vscode.workspace.getConfiguration('commitCraft');
+          for (const [key, value] of Object.entries(msg.data)) {
+            await cfg.update(key, value, vscode.ConfigurationTarget.Global);
+          }
+          panel.webview.postMessage({ type: 'saveResult', success: true });
+          vscode.window.showInformationMessage('CommitCraft: Settings saved ✅');
+        } catch (err: any) {
+          panel.webview.postMessage({ type: 'saveResult', success: false, error: err.message });
+          vscode.window.showErrorMessage(`CommitCraft: Save failed - ${err.message}`);
         }
-        vscode.window.showInformationMessage('CommitCraft: Settings saved ✅');
       }
     });
   });
 }
 
-function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
+function getWebviewContent(webview: vscode.Webview, config: vscode.WorkspaceConfiguration): string {
   const apiBaseUrl = config.get<string>('apiBaseUrl', '');
   const apiKey = config.get<string>('apiKey', '');
   const presetModel = config.get<string>('presetModel', 'gpt-4o-mini');
@@ -34,16 +43,15 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
   const style = config.get<string>('style', 'conventional');
   const detail = config.get<string>('detail', 'concise');
   const maxDiffLength = config.get<number>('maxDiffLength', 8000);
-
-  // Detect current provider from baseUrl
   const currentProvider = detectProvider(apiBaseUrl);
-
   const providersJson = JSON.stringify(PROVIDERS);
+  const nonce = getNonce();
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
   :root {
     --bg: var(--vscode-editor-background);
@@ -96,9 +104,9 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
     margin-top: 4px;
   }
   button:hover { background: var(--btn-hover); }
+  button.saving { opacity: 0.6; pointer-events: none; }
   hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   .section { font-size: 0.95em; font-weight: 600; margin-bottom: 10px; }
-  .url-override { margin-top: 6px; }
   .preview-box {
     background: var(--vscode-textBlockQuote-background, rgba(0,0,0,0.15));
     border: 1px solid var(--border);
@@ -125,50 +133,39 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
 </style>
 </head>
 <body>
-
 <h1>⚙️ CommitCraft Settings</h1>
 <p class="subtitle">Select a provider, then choose your model</p>
 
 <div class="section">🔌 Provider</div>
-
 <div class="field">
   <label>Provider</label>
-  <select id="provider" onchange="onProviderChange()">
-  </select>
+  <select id="provider"></select>
 </div>
-
-<div class="field" id="urlField">
+<div class="field">
   <label>API Base URL</label>
   <input id="apiBaseUrl" type="text" value="${esc(apiBaseUrl)}" placeholder="https://..." />
-  <div class="hint">Auto-filled by provider. Edit to use a proxy or custom endpoint.</div>
+  <div class="hint" id="urlHint">Auto-filled by provider. Edit to use a proxy or custom endpoint.</div>
 </div>
-
-<div class="field" id="apiKeyField">
+<div class="field">
   <label>API Key</label>
   <input id="apiKey" type="password" value="${esc(apiKey)}" placeholder="sk-..." />
 </div>
 
 <hr />
-
 <div class="section">🤖 Model</div>
-
-<div class="field" id="modelField">
+<div class="field">
   <label>Model</label>
-  <select id="presetModel">
-  </select>
+  <select id="presetModel"></select>
   <div class="hint" id="modelHint"></div>
 </div>
-
-<div class="field" id="customModelField">
+<div class="field">
   <label>Custom Model (optional)</label>
   <input id="customModel" type="text" value="${esc(customModel)}" placeholder="e.g. anthropic/claude-sonnet-4" />
   <div class="hint">Overrides the preset model above</div>
 </div>
 
 <hr />
-
 <div class="section">📝 Commit Message Format</div>
-
 <div class="row">
   <div class="field">
     <label>Language</label>
@@ -194,7 +191,6 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
     <div class="hint">Short title vs. detailed description</div>
   </div>
 </div>
-
 <div class="preview-box">
   <div class="preview-label">Preview</div>
   <pre id="preview" class="preview-text"></pre>
@@ -206,115 +202,138 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
   <div class="hint">Characters sent to the model (truncated if exceeded)</div>
 </div>
 
-<button onclick="save()">💾 Save Settings</button>
+<button id="saveBtn">💾 Save Settings</button>
 
-<script>
-const providers = ${providersJson};
-const currentProvider = "${esc(currentProvider)}";
-const currentPresetModel = "${esc(presetModel)}";
-const currentCustomModel = "${esc(customModel)}";
+<script nonce="${nonce}">
+(function() {
+  const vscode = acquireVsCodeApi();
+  const providers = ${providersJson};
+  const currentPresetModel = ${JSON.stringify(presetModel)};
+  const currentCustomModel = ${JSON.stringify(customModel)};
+  const currentProviderName = ${JSON.stringify(currentProvider)};
 
-// Build provider dropdown
-const providerSel = document.getElementById('provider');
-providers.forEach((p, i) => {
-  const opt = document.createElement('option');
-  opt.value = i;
-  opt.textContent = p.name;
-  if (p.name === currentProvider) opt.selected = true;
-  providerSel.appendChild(opt);
-});
+  // Build provider dropdown
+  const providerSel = document.getElementById('provider');
+  providers.forEach(function(p, i) {
+    var opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = p.name;
+    if (p.name === currentProviderName) opt.selected = true;
+    providerSel.appendChild(opt);
+  });
 
-function onProviderChange() {
-  const p = providers[providerSel.value];
-  const urlInput = document.getElementById('apiBaseUrl');
-  const urlHint = urlInput.nextElementSibling;
+  function onProviderChange() {
+    var idx = parseInt(providerSel.value, 10);
+    var p = providers[idx];
+    var urlInput = document.getElementById('apiBaseUrl');
+    var urlHint = document.getElementById('urlHint');
 
-  if (p.note) {
-    urlInput.value = '';
-    urlInput.placeholder = 'Enter your proxy URL';
-    urlHint.innerHTML = p.note;
-    urlHint.style.color = 'var(--vscode-editorWarning-foreground, #CCA700)';
-  } else if (p.name === 'Custom') {
-    urlInput.value = '';
-    urlInput.placeholder = 'https://your-proxy.com/v1';
-    urlHint.textContent = 'Enter your OpenAI-compatible endpoint URL';
-  } else {
-    urlInput.value = p.baseUrl;
-    urlHint.textContent = 'Auto-filled by provider. Edit to use a proxy or custom endpoint.';
+    if (p.note) {
+      urlInput.value = '';
+      urlInput.placeholder = 'Enter your proxy URL';
+      urlHint.innerHTML = p.note;
+    } else if (p.name === 'Custom') {
+      urlInput.value = '';
+      urlInput.placeholder = 'https://your-proxy.com/v1';
+      urlHint.textContent = 'Enter your OpenAI-compatible endpoint URL';
+    } else {
+      urlInput.value = p.baseUrl;
+      urlHint.textContent = 'Auto-filled by provider. Edit to use a proxy or custom endpoint.';
+    }
+
+    // Build model list
+    var modelSel = document.getElementById('presetModel');
+    modelSel.innerHTML = '';
+    var hint = document.getElementById('modelHint');
+    if (!p.models || p.models.length === 0) {
+      var o = document.createElement('option');
+      o.value = '';
+      o.textContent = '(use custom model)';
+      modelSel.appendChild(o);
+      hint.textContent = 'Enter model name in the Custom Model field below';
+    } else {
+      hint.textContent = '';
+      p.models.forEach(function(m) {
+        var o = document.createElement('option');
+        o.value = m.value;
+        o.textContent = m.label + ' (' + m.value + ')';
+        if (m.value === currentPresetModel) o.selected = true;
+        modelSel.appendChild(o);
+      });
+    }
   }
-  // Build model list
-  const modelSel = document.getElementById('presetModel');
-  modelSel.innerHTML = '';
-  if (p.models.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = '(use custom model)';
-    modelSel.appendChild(opt);
-    document.getElementById('modelHint').textContent = 'Enter model name in the Custom Model field below';
-  } else {
-    document.getElementById('modelHint').textContent = '';
-    p.models.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.value;
-      opt.textContent = m.label + ' (' + m.value + ')';
-      if (m.value === currentPresetModel) opt.selected = true;
-      modelSel.appendChild(opt);
+
+  providerSel.addEventListener('change', onProviderChange);
+  onProviderChange();
+
+  // Preview
+  var PREVIEWS = {
+    conventional: {
+      concise: 'feat(auth): add login with Google OAuth',
+      detailed: 'feat(auth): add login with Google OAuth\\n\\nImplement Google OAuth2 login flow to replace\\nemail/password auth. Updates the auth service\\nand adds the OAuth callback handler.'
+    },
+    simple: {
+      concise: 'Add Google OAuth login',
+      detailed: 'Add Google OAuth login\\n\\nImplement Google OAuth2 login flow to replace\\nemail/password auth. Updates the auth service\\nand adds the OAuth callback handler.'
+    },
+    emoji: {
+      concise: '✨ Add Google OAuth login',
+      detailed: '✨ Add Google OAuth login\\n\\nImplement Google OAuth2 login flow to replace\\nemail/password auth. Updates the auth service\\nand adds the OAuth callback handler.'
+    }
+  };
+
+  function updatePreview() {
+    var s = document.getElementById('style').value;
+    var d = document.getElementById('detail').value;
+    var txt = (PREVIEWS[s] && PREVIEWS[s][d]) ? PREVIEWS[s][d] : '';
+    document.getElementById('preview').textContent = txt.replace(/\\\\n/g, '\\n');
+  }
+
+  document.getElementById('style').addEventListener('change', updatePreview);
+  document.getElementById('detail').addEventListener('change', updatePreview);
+  updatePreview();
+
+  // Custom model
+  if (currentCustomModel) {
+    document.getElementById('customModel').value = currentCustomModel;
+  }
+
+  // Save
+  document.getElementById('saveBtn').addEventListener('click', function() {
+    var btn = document.getElementById('saveBtn');
+    btn.classList.add('saving');
+    btn.textContent = '⏳ Saving...';
+    vscode.postMessage({
+      type: 'save',
+      data: {
+        apiBaseUrl: document.getElementById('apiBaseUrl').value,
+        apiKey: document.getElementById('apiKey').value,
+        presetModel: document.getElementById('presetModel').value,
+        customModel: document.getElementById('customModel').value,
+        language: document.getElementById('language').value,
+        style: document.getElementById('style').value,
+        detail: document.getElementById('detail').value,
+        maxDiffLength: parseInt(document.getElementById('maxDiffLength').value) || 8000
+      }
     });
-  }
-}
+  });
 
-// Initialize
-onProviderChange();
-
-// Preview
-const PREVIEWS = {
-  conventional: {
-    concise: 'feat(auth): add login with Google OAuth',
-    detailed: 'feat(auth): add login with Google OAuth\n\nImplement Google OAuth2 login flow to replace\nemail/password auth. Updates the auth service\nand adds the OAuth callback handler.',
-  },
-  simple: {
-    concise: 'Add Google OAuth login',
-    detailed: 'Add Google OAuth login\n\nImplement Google OAuth2 login flow to replace\nemail/password auth. Updates the auth service\nand adds the OAuth callback handler.',
-  },
-  emoji: {
-    concise: '✨ Add Google OAuth login',
-    detailed: '✨ Add Google OAuth login\n\nImplement Google OAuth2 login flow to replace\nemail/password auth. Updates the auth service\nand adds the OAuth callback handler.',
-  },
-};
-
-function updatePreview() {
-  const s = document.getElementById('style').value;
-  const d = document.getElementById('detail').value;
-  const preview = PREVIEWS[s]?.[d] || '';
-  document.getElementById('preview').textContent = preview;
-}
-
-document.getElementById('style').addEventListener('change', updatePreview);
-document.getElementById('detail').addEventListener('change', updatePreview);
-updatePreview();
-
-// If we have a custom model, try to select it or show it
-if (currentCustomModel) {
-  document.getElementById('customModel').value = currentCustomModel;
-}
-
-const vscode = acquireVsCodeApi();
-function save() {
-  const urlVal = document.getElementById('apiBaseUrl').value;
-  vscode.postMessage({
-    type: 'save',
-    data: {
-      apiBaseUrl: urlVal,
-      apiKey: document.getElementById('apiKey').value,
-      presetModel: document.getElementById('presetModel').value,
-      customModel: document.getElementById('customModel').value,
-      language: document.getElementById('language').value,
-      style: document.getElementById('style').value,
-      detail: document.getElementById('detail').value,
-      maxDiffLength: parseInt(document.getElementById('maxDiffLength').value) || 8000,
+  // Save result feedback
+  window.addEventListener('message', function(event) {
+    var msg = event.data;
+    if (msg.type === 'saveResult') {
+      var btn = document.getElementById('saveBtn');
+      btn.classList.remove('saving');
+      if (msg.success) {
+        btn.textContent = '✅ Saved!';
+        setTimeout(function() { btn.textContent = '💾 Save Settings'; }, 2000);
+      } else {
+        btn.textContent = '❌ Failed';
+        setTimeout(function() { btn.textContent = '💾 Save Settings'; }, 2000);
+      }
     }
   });
-}
+})();
 </script>
 </body>
 </html>`;
@@ -333,12 +352,20 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-function selOpt(value: string, current: string): string {
-  const selected = value === current ? ' selected' : '';
-  return `<option value="${esc(value)}"${selected}>${esc(value)}</option>`;
-}
-
 function langOptions(current: string): string {
   const langs = ['English', '中文', '日本語', '한국어', 'Français', 'Deutsch', 'Español'];
-  return langs.map(l => selOpt(l, current)).join('\n');
+  return langs.map(l => {
+    const selected = l === current ? ' selected' : '';
+    const safe = l.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    return `<option value="${safe}"${selected}>${safe}</option>`;
+  }).join('\n');
+}
+
+function getNonce(): string {
+  let text = '';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  for (let i = 0; i < 32; i++) {
+    text += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return text;
 }
