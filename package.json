@@ -26,7 +26,7 @@
       {
         "command": "commitCraft.generate",
         "title": "CommitCraft: Generate Commit Message",
-        "icon": "$(sparkle)"
+        "icon": "$(wand)"
       },
       {
         "command": "commitCraft.configure",
@@ -43,7 +43,7 @@
       "scm/title": [
         {
           "command": "commitCraft.generate",
-          "group": "navigation"
+          "group": "navigation@100"
         }
       ]
     },
