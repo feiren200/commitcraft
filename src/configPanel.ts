@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { PROVIDERS } from './providers';
 
 export function registerConfigPanel(context: vscode.ExtensionContext): vscode.Disposable {
   return vscode.commands.registerCommand('commitCraft.configure', () => {
@@ -34,11 +35,15 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
   const detail = config.get<string>('detail', 'concise');
   const maxDiffLength = config.get<number>('maxDiffLength', 8000);
 
+  // Detect current provider from baseUrl
+  const currentProvider = detectProvider(apiBaseUrl);
+
+  const providersJson = JSON.stringify(PROVIDERS);
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   :root {
     --bg: var(--vscode-editor-background);
@@ -49,28 +54,22 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
     --btn-bg: var(--vscode-button-background);
     --btn-fg: var(--vscode-button-foreground);
     --btn-hover: var(--vscode-button-hoverBackground);
-    --label: var(--vscode-foreground);
     --hint: var(--vscode-descriptionForeground);
+    --border: var(--vscode-panel-border);
   }
   body {
     font-family: var(--vscode-font-family);
     color: var(--fg);
     background: var(--bg);
     padding: 24px;
-    max-width: 640px;
+    max-width: 600px;
     margin: 0 auto;
   }
   h1 { font-size: 1.4em; margin-bottom: 4px; }
-  .subtitle { color: var(--hint); font-size: 0.85em; margin-bottom: 24px; }
-  .field { margin-bottom: 16px; }
-  label {
-    display: block;
-    font-size: 0.9em;
-    font-weight: 600;
-    margin-bottom: 4px;
-    color: var(--label);
-  }
-  .hint { color: var(--hint); font-size: 0.8em; margin-top: 2px; }
+  .subtitle { color: var(--hint); font-size: 0.85em; margin-bottom: 20px; }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-size: 0.88em; font-weight: 600; margin-bottom: 4px; }
+  .hint { color: var(--hint); font-size: 0.78em; margin-top: 2px; }
   input, select {
     width: 100%;
     padding: 6px 8px;
@@ -82,10 +81,7 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
     font-family: var(--vscode-font-family);
     box-sizing: border-box;
   }
-  input:focus, select:focus {
-    outline: 1px solid var(--btn-bg);
-    border-color: var(--btn-bg);
-  }
+  input:focus, select:focus { outline: 1px solid var(--btn-bg); border-color: var(--btn-bg); }
   .row { display: flex; gap: 12px; }
   .row > .field { flex: 1; }
   button {
@@ -97,108 +93,79 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
     font-size: 0.9em;
     cursor: pointer;
     font-family: var(--vscode-font-family);
-    margin-top: 8px;
+    margin-top: 4px;
   }
   button:hover { background: var(--btn-hover); }
-  .divider {
-    border: none;
-    border-top: 1px solid var(--vscode-panel-border);
-    margin: 20px 0;
-  }
-  .section-title {
-    font-size: 1em;
-    font-weight: 600;
-    margin-bottom: 12px;
-  }
-  .test-btn {
-    background: transparent;
-    border: 1px solid var(--btn-bg);
-    color: var(--btn-bg);
-    padding: 4px 12px;
-    font-size: 0.8em;
-    margin-left: 8px;
-  }
-  .test-btn:hover {
-    background: var(--btn-bg);
-    color: var(--btn-fg);
-  }
+  hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+  .section { font-size: 0.95em; font-weight: 600; margin-bottom: 10px; }
+  .url-override { margin-top: 6px; }
 </style>
 </head>
 <body>
-<h1>⚙️ CommitCraft Settings</h1>
-<p class="subtitle">Configure your AI commit message generator</p>
 
-<div class="section-title">API Connection</div>
+<h1>⚙️ CommitCraft Settings</h1>
+<p class="subtitle">Select a provider, then choose your model</p>
+
+<div class="section">🔌 Provider</div>
 
 <div class="field">
-  <label>API Base URL</label>
-  <input id="apiBaseUrl" type="text" value="${esc(apiBaseUrl)}" placeholder="https://api.openai.com/v1" />
-  <div class="hint">OpenAI-compatible endpoint. Works with proxies.</div>
+  <label>Provider</label>
+  <select id="provider" onchange="onProviderChange()">
+  </select>
 </div>
 
-<div class="field">
+<div class="field" id="urlField">
+  <label>API Base URL</label>
+  <input id="apiBaseUrl" type="text" value="${esc(apiBaseUrl)}" placeholder="https://..." />
+  <div class="hint">Auto-filled by provider. Edit to use a proxy or custom endpoint.</div>
+</div>
+
+<div class="field" id="apiKeyField">
   <label>API Key</label>
   <input id="apiKey" type="password" value="${esc(apiKey)}" placeholder="sk-..." />
 </div>
 
-<hr class="divider" />
-<div class="section-title">Model</div>
+<hr />
 
-<div class="row">
-  <div class="field">
-    <label>Preset Model</label>
-    <select id="presetModel">
-      ${modelOption('gpt-4o', 'OpenAI GPT-4o', presetModel)}
-      ${modelOption('gpt-4o-mini', 'OpenAI GPT-4o Mini', presetModel)}
-      ${modelOption('o3-mini', 'OpenAI o3-mini', presetModel)}
-      ${modelOption('claude-sonnet-4-20250514', 'Claude Sonnet 4 (proxy)', presetModel)}
-      ${modelOption('claude-opus-4-20250514', 'Claude Opus 4 (proxy)', presetModel)}
-      ${modelOption('claude-3-5-haiku-20241022', 'Claude 3.5 Haiku (proxy)', presetModel)}
-      ${modelOption('gemini-2.5-flash', 'Gemini 2.5 Flash', presetModel)}
-      ${modelOption('gemini-2.5-pro', 'Gemini 2.5 Pro', presetModel)}
-      ${modelOption('deepseek-chat', 'DeepSeek V3', presetModel)}
-      ${modelOption('deepseek-reasoner', 'DeepSeek R1', presetModel)}
-      ${modelOption('moonshot-v1-8k', 'Moonshot Kimi', presetModel)}
-      ${modelOption('glm-4-plus', 'Zhipu GLM-4', presetModel)}
-      ${modelOption('qwen-plus', 'Tongyi Qwen', presetModel)}
-    </select>
-  </div>
-  <div class="field">
-    <label>Custom Model (overrides preset)</label>
-    <input id="customModel" type="text" value="${esc(customModel)}" placeholder="e.g. anthropic/claude-sonnet-4" />
-    <div class="hint">For OpenRouter or unsupported models</div>
-  </div>
+<div class="section">🤖 Model</div>
+
+<div class="field" id="modelField">
+  <label>Model</label>
+  <select id="presetModel">
+  </select>
+  <div class="hint" id="modelHint"></div>
 </div>
 
-<hr class="divider" />
-<div class="section-title">Commit Style</div>
+<div class="field" id="customModelField">
+  <label>Custom Model (optional)</label>
+  <input id="customModel" type="text" value="${esc(customModel)}" placeholder="e.g. anthropic/claude-sonnet-4" />
+  <div class="hint">Overrides the preset model above</div>
+</div>
+
+<hr />
+
+<div class="section">📝 Commit Style</div>
 
 <div class="row">
   <div class="field">
     <label>Language</label>
     <select id="language">
-      ${opt('English', language)}
-      ${opt('中文', language)}
-      ${opt('日本語', language)}
-      ${opt('한국어', language)}
-      ${opt('Français', language)}
-      ${opt('Deutsch', language)}
-      ${opt('Español', language)}
+      ${langOptions(language)}
     </select>
   </div>
   <div class="field">
     <label>Style</label>
     <select id="style">
-      ${opt('conventional', style)}
-      ${opt('simple', style)}
-      ${opt('emoji', style)}
+      ${selOpt('conventional', style)}
+      ${selOpt('simple', style)}
+      ${selOpt('emoji', style)}
     </select>
   </div>
   <div class="field">
     <label>Detail</label>
     <select id="detail">
-      ${opt('concise', detail)}
-      ${opt('detailed', detail)}
+      ${selOpt('concise', detail)}
+      ${selOpt('detailed', detail)}
     </select>
   </div>
 </div>
@@ -206,43 +173,99 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
 <div class="field">
   <label>Max Diff Length</label>
   <input id="maxDiffLength" type="number" value="${maxDiffLength}" min="1000" max="50000" step="1000" />
-  <div class="hint">Characters sent to the model (truncated if exceeded)</div>
 </div>
 
 <button onclick="save()">💾 Save Settings</button>
 
 <script>
-  const vscode = acquireVsCodeApi();
-  function save() {
-    vscode.postMessage({
-      type: 'save',
-      data: {
-        apiBaseUrl: document.getElementById('apiBaseUrl').value,
-        apiKey: document.getElementById('apiKey').value,
-        presetModel: document.getElementById('presetModel').value,
-        customModel: document.getElementById('customModel').value,
-        language: document.getElementById('language').value,
-        style: document.getElementById('style').value,
-        detail: document.getElementById('detail').value,
-        maxDiffLength: parseInt(document.getElementById('maxDiffLength').value) || 8000,
-      }
+const providers = ${providersJson};
+const currentProvider = "${esc(currentProvider)}";
+const currentPresetModel = "${esc(presetModel)}";
+const currentCustomModel = "${esc(customModel)}";
+
+// Build provider dropdown
+const providerSel = document.getElementById('provider');
+providers.forEach((p, i) => {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = p.name;
+  if (p.name === currentProvider) opt.selected = true;
+  providerSel.appendChild(opt);
+});
+
+function onProviderChange() {
+  const p = providers[providerSel.value];
+  document.getElementById('apiBaseUrl').value = p.baseUrl;
+  // Build model list
+  const modelSel = document.getElementById('presetModel');
+  modelSel.innerHTML = '';
+  if (p.models.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '(use custom model)';
+    modelSel.appendChild(opt);
+    document.getElementById('modelHint').textContent = 'Enter model name in the Custom Model field below';
+  } else {
+    document.getElementById('modelHint').textContent = '';
+    p.models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.value;
+      opt.textContent = m.label + ' (' + m.value + ')';
+      if (m.value === currentPresetModel) opt.selected = true;
+      modelSel.appendChild(opt);
     });
   }
+}
+
+// Initialize
+onProviderChange();
+
+// If we have a custom model, try to select it or show it
+if (currentCustomModel) {
+  document.getElementById('customModel').value = currentCustomModel;
+}
+
+const vscode = acquireVsCodeApi();
+function save() {
+  const urlVal = document.getElementById('apiBaseUrl').value;
+  vscode.postMessage({
+    type: 'save',
+    data: {
+      apiBaseUrl: urlVal,
+      apiKey: document.getElementById('apiKey').value,
+      presetModel: document.getElementById('presetModel').value,
+      customModel: document.getElementById('customModel').value,
+      language: document.getElementById('language').value,
+      style: document.getElementById('style').value,
+      detail: document.getElementById('detail').value,
+      maxDiffLength: parseInt(document.getElementById('maxDiffLength').value) || 8000,
+    }
+  });
+}
 </script>
 </body>
 </html>`;
+}
+
+function detectProvider(baseUrl: string): string {
+  for (const p of PROVIDERS) {
+    if (p.baseUrl && baseUrl.startsWith(p.baseUrl)) {
+      return p.name;
+    }
+  }
+  return 'Custom';
 }
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-function modelOption(value: string, label: string, current: string): string {
-  const selected = value === current ? ' selected' : '';
-  return `<option value="${esc(value)}"${selected}>${esc(label)} (${esc(value)})</option>`;
-}
-
-function opt(value: string, current: string): string {
+function selOpt(value: string, current: string): string {
   const selected = value === current ? ' selected' : '';
   return `<option value="${esc(value)}"${selected}>${esc(value)}</option>`;
+}
+
+function langOptions(current: string): string {
+  const langs = ['English', '中文', '日本語', '한국어', 'Français', 'Deutsch', 'Español'];
+  return langs.map(l => selOpt(l, current)).join('\n');
 }

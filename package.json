@@ -38,12 +38,10 @@
       "scm/title": [
         {
           "command": "commitCraft.generate",
-          "when": "scmProvider == git",
           "group": "inline@1"
         },
         {
           "command": "commitCraft.configure",
-          "when": "scmProvider == git",
           "group": "inline@2"
         }
       ]
@@ -64,37 +62,7 @@
         "commitCraft.presetModel": {
           "type": "string",
           "default": "gpt-4o-mini",
-          "enum": [
-            "gpt-4o",
-            "gpt-4o-mini",
-            "o3-mini",
-            "claude-sonnet-4-20250514",
-            "claude-opus-4-20250514",
-            "claude-3-5-haiku-20241022",
-            "gemini-2.5-flash",
-            "gemini-2.5-pro",
-            "deepseek-chat",
-            "deepseek-reasoner",
-            "moonshot-v1-8k",
-            "glm-4-plus",
-            "qwen-plus"
-          ],
-          "enumDescriptions": [
-            "OpenAI GPT-4o",
-            "OpenAI GPT-4o Mini (fast, cheap)",
-            "OpenAI o3-mini (reasoning)",
-            "Anthropic Claude Sonnet 4 (via proxy)",
-            "Anthropic Claude Opus 4 (via proxy)",
-            "Anthropic Claude 3.5 Haiku (via proxy)",
-            "Google Gemini 2.5 Flash",
-            "Google Gemini 2.5 Pro",
-            "DeepSeek V3",
-            "DeepSeek R1 (reasoning)",
-            "Moonshot Kimi 8K",
-            "Zhipu GLM-4 Plus",
-            "Alibaba Tongyi Qwen Plus"
-          ],
-          "description": "Preset model selection. Set customModel to use a different model."
+          "description": "Preset model name (set via the configuration panel)"
         },
         "commitCraft.customModel": {
           "type": "string",
