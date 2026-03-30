@@ -13,6 +13,7 @@
     "url": "https://github.com/feiren200/commitcraft/issues"
   },
   "homepage": "https://github.com/feiren200/commitcraft#readme",
+  "icon": "icon.png",
 
   "engines": {
     "vscode": "^1.85.0"
