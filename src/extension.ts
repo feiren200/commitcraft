@@ -33,8 +33,8 @@ async function handleGenerate(): Promise<void> {
   const model = resolveModel(config);
 
   if (!apiBaseUrl) {
-    const action = await vscode.window.showErrorMessage(
-      'CommitCraft: API Base URL not configured.',
+    const action = await vscode.window.showWarningMessage(
+      'CommitCraft: Please configure your API first.',
       'Open Settings'
     );
     if (action === 'Open Settings') {

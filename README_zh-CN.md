@@ -20,40 +20,54 @@
 
 ## 快速开始
 
-1. 安装插件
-2. 打开设置 → 搜索 "CommitCraft"
-3. 配置 API：
-   - **API Base URL**：你的接口地址，例如 `https://api.openai.com/v1`
-   - **API Key**：你的密钥
-   - **Model**：模型名称，例如 `gpt-4o-mini`
-4. 在 Git 中暂存（Stage）你的更改
-5. 点击源代码管理标题栏的 ✨ 按钮
-6. 生成的 commit 信息自动填入输入框
+### 1. 配置 API
+
+打开配置面板：
+
+- **命令面板**：`Ctrl+Shift+P` → 搜索 `CommitCraft: Open Settings`
+- 或者点击源代码管理标题栏的 ⚙️ 按钮
+
+选择**提供商**（OpenAI、DeepSeek、OpenRouter 等），输入 **API Key**，选择**模型**。API 地址会根据提供商自动填充。
+
+### 2. 生成 Commit 信息
+
+1. 在 Git 中暂存（Stage）你的更改
+2. 点击源代码管理标题栏的 🪄 按钮
+3. 生成的 commit 信息自动填入输入框
+
+### 常用配置示例
+
+| 提供商     | API 地址                       | 说明                |
+| ---------- | ------------------------------ | ------------------- |
+| OpenAI     | `https://api.openai.com/v1`    | 默认，填 Key 即可   |
+| DeepSeek   | `https://api.deepseek.com/v1`  | 提供商选 "DeepSeek" |
+| OpenRouter | `https://openrouter.ai/api/v1` | 一个 Key 用所有模型 |
+| 任意中转   | 你的代理地址                   | 提供商选 "Custom"   |
 
 ## 配置项
 
-| 设置 | 说明 | 默认值 |
-|---|---|---|
-| `commitCraft.apiBaseUrl` | API 地址（OpenAI 兼容） | `https://api.openai.com/v1` |
-| `commitCraft.apiKey` | API 密钥 | （空） |
-| `commitCraft.presetModel` | 预设模型选择（下拉框） | `gpt-4o-mini` |
-| `commitCraft.customModel` | 自定义模型名（覆盖预设） | （空） |
-| `commitCraft.language` | 提交信息语言 | `English` |
-| `commitCraft.style` | 风格：`conventional` / `simple` / `emoji` | `conventional` |
-| `commitCraft.detail` | 详细程度：`concise` / `detailed` | `concise` |
-| `commitCraft.maxDiffLength` | 发送给模型的最大 diff 字符数 | `8000` |
+| 设置                        | 说明                                      | 默认值                      |
+| --------------------------- | ----------------------------------------- | --------------------------- |
+| `commitCraft.apiBaseUrl`    | API 地址（OpenAI 兼容）                   | `https://api.openai.com/v1` |
+| `commitCraft.apiKey`        | API 密钥                                  | （空）                      |
+| `commitCraft.presetModel`   | 预设模型选择（下拉框）                    | `gpt-4o-mini`               |
+| `commitCraft.customModel`   | 自定义模型名（覆盖预设）                  | （空）                      |
+| `commitCraft.language`      | 提交信息语言                              | `English`                   |
+| `commitCraft.style`         | 风格：`conventional` / `simple` / `emoji` | `conventional`              |
+| `commitCraft.detail`        | 详细程度：`concise` / `detailed`          | `concise`                   |
+| `commitCraft.maxDiffLength` | 发送给模型的最大 diff 字符数              | `8000`                      |
 
 ### 预设模型
 
-| 厂商 | 模型 |
-|---|---|
-| OpenAI | gpt-4o, gpt-4o-mini, o3-mini |
-| Anthropic | claude-sonnet-4, claude-opus-4, claude-3-5-haiku *（需中转）* |
-| Google | gemini-2.5-flash, gemini-2.5-pro |
-| DeepSeek | deepseek-chat, deepseek-reasoner |
-| Moonshot | moonshot-v1-8k |
-| 智谱 | glm-4-plus |
-| 阿里 | qwen-plus |
+| 厂商      | 模型                                                          |
+| --------- | ------------------------------------------------------------- |
+| OpenAI    | gpt-4o, gpt-4o-mini, o3-mini                                  |
+| Anthropic | claude-sonnet-4, claude-opus-4, claude-3-5-haiku _（需中转）_ |
+| Google    | gemini-2.5-flash, gemini-2.5-pro                              |
+| DeepSeek  | deepseek-chat, deepseek-reasoner                              |
+| Moonshot  | moonshot-v1-8k                                                |
+| 智谱      | glm-4-plus                                                    |
+| 阿里      | qwen-plus                                                     |
 
 使用 `customModel` 可填入预设列表之外的任意模型，例如通过 OpenRouter 使用 `anthropic/claude-sonnet-4`。
 
@@ -61,14 +75,14 @@
 
 任何实现 OpenAI Chat Completions 格式的服务均可使用：
 
-| 服务 | Base URL 示例 |
-|---|---|
-| OpenAI | `https://api.openai.com/v1` |
-| DeepSeek | `https://api.deepseek.com/v1` |
-| Moonshot（Kimi） | `https://api.moonshot.cn/v1` |
-| 智谱（GLM） | `https://open.bigmodel.cn/api/paas/v4` |
-| 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| 任意中转 | `https://your-proxy.com/v1` |
+| 服务             | Base URL 示例                                       |
+| ---------------- | --------------------------------------------------- |
+| OpenAI           | `https://api.openai.com/v1`                         |
+| DeepSeek         | `https://api.deepseek.com/v1`                       |
+| Moonshot（Kimi） | `https://api.moonshot.cn/v1`                        |
+| 智谱（GLM）      | `https://open.bigmodel.cn/api/paas/v4`              |
+| 通义千问         | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| 任意中转         | `https://your-proxy.com/v1`                         |
 
 ## 工作原理
 

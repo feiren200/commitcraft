@@ -20,40 +20,54 @@ Generate git commit messages with AI. Supports any OpenAI-compatible API includi
 
 ## Getting Started
 
-1. Install the extension
-2. Open Settings → search "CommitCraft"
-3. Configure your API:
-   - **API Base URL**: Your endpoint, e.g. `https://api.openai.com/v1`
-   - **API Key**: Your API key
-   - **Model**: Model identifier, e.g. `gpt-4o-mini`
-4. Stage your changes in Git
-5. Click the ✨ button in the Source Control title bar
-6. The generated commit message appears in the input box
+### 1. Configure API
+
+Open the configuration panel:
+
+- **Command Palette**: `Ctrl+Shift+P` → search `CommitCraft: Open Settings`
+- Or click the ⚙️ button in the Source Control title bar
+
+Select a **Provider** (OpenAI, DeepSeek, OpenRouter, etc.), enter your **API Key**, and choose a **Model**. The API Base URL is auto-filled based on your provider choice.
+
+### 2. Generate Commit Message
+
+1. Stage your changes in Git
+2. Click the 🪄 button in the Source Control title bar
+3. The generated commit message appears in the input box
+
+### Quick Configuration Examples
+
+| Provider | API Base URL | Notes |
+|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | Default, just add your key |
+| DeepSeek | `https://api.deepseek.com/v1` | Select "DeepSeek" in provider dropdown |
+| OpenRouter | `https://openrouter.ai/api/v1` | Access all models with one key |
+| Any proxy | Your proxy URL | Select "Custom" provider |
 
 ## Configuration
 
-| Setting | Description | Default |
-|---|---|---|
-| `commitCraft.apiBaseUrl` | API base URL (OpenAI-compatible) | `https://api.openai.com/v1` |
-| `commitCraft.apiKey` | API key | (empty) |
-| `commitCraft.presetModel` | Preset model selection (dropdown) | `gpt-4o-mini` |
-| `commitCraft.customModel` | Custom model name (overrides preset) | (empty) |
-| `commitCraft.language` | Commit message language | `English` |
-| `commitCraft.style` | Style: `conventional` / `simple` / `emoji` | `conventional` |
-| `commitCraft.detail` | Detail level: `concise` / `detailed` | `concise` |
-| `commitCraft.maxDiffLength` | Max diff characters sent to the model | `8000` |
+| Setting                     | Description                                | Default                     |
+| --------------------------- | ------------------------------------------ | --------------------------- |
+| `commitCraft.apiBaseUrl`    | API base URL (OpenAI-compatible)           | `https://api.openai.com/v1` |
+| `commitCraft.apiKey`        | API key                                    | (empty)                     |
+| `commitCraft.presetModel`   | Preset model selection (dropdown)          | `gpt-4o-mini`               |
+| `commitCraft.customModel`   | Custom model name (overrides preset)       | (empty)                     |
+| `commitCraft.language`      | Commit message language                    | `English`                   |
+| `commitCraft.style`         | Style: `conventional` / `simple` / `emoji` | `conventional`              |
+| `commitCraft.detail`        | Detail level: `concise` / `detailed`       | `concise`                   |
+| `commitCraft.maxDiffLength` | Max diff characters sent to the model      | `8000`                      |
 
 ### Preset Models
 
-| Provider | Models |
-|---|---|
-| OpenAI | gpt-4o, gpt-4o-mini, o3-mini |
-| Anthropic | claude-sonnet-4, claude-opus-4, claude-3-5-haiku *(via proxy)* |
-| Google | gemini-2.5-flash, gemini-2.5-pro |
-| DeepSeek | deepseek-chat, deepseek-reasoner |
-| Moonshot | moonshot-v1-8k |
-| Zhipu | glm-4-plus |
-| Alibaba | qwen-plus |
+| Provider  | Models                                                         |
+| --------- | -------------------------------------------------------------- |
+| OpenAI    | gpt-4o, gpt-4o-mini, o3-mini                                   |
+| Anthropic | claude-sonnet-4, claude-opus-4, claude-3-5-haiku _(via proxy)_ |
+| Google    | gemini-2.5-flash, gemini-2.5-pro                               |
+| DeepSeek  | deepseek-chat, deepseek-reasoner                               |
+| Moonshot  | moonshot-v1-8k                                                 |
+| Zhipu     | glm-4-plus                                                     |
+| Alibaba   | qwen-plus                                                      |
 
 Use `customModel` for any model not in the preset list, e.g. `anthropic/claude-sonnet-4` via OpenRouter.
 
@@ -61,14 +75,14 @@ Use `customModel` for any model not in the preset list, e.g. `anthropic/claude-s
 
 Any service that implements the OpenAI Chat Completions API format:
 
-| Service | Base URL Example |
-|---|---|
-| OpenAI | `https://api.openai.com/v1` |
-| DeepSeek | `https://api.deepseek.com/v1` |
-| Moonshot (Kimi) | `https://api.moonshot.cn/v1` |
-| Zhipu (GLM) | `https://open.bigmodel.cn/api/paas/v4` |
-| Tongyi Qianwen | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
-| Any proxy | `https://your-proxy.com/v1` |
+| Service         | Base URL Example                                    |
+| --------------- | --------------------------------------------------- |
+| OpenAI          | `https://api.openai.com/v1`                         |
+| DeepSeek        | `https://api.deepseek.com/v1`                       |
+| Moonshot (Kimi) | `https://api.moonshot.cn/v1`                        |
+| Zhipu (GLM)     | `https://open.bigmodel.cn/api/paas/v4`              |
+| Tongyi Qianwen  | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| Any proxy       | `https://your-proxy.com/v1`                         |
 
 ## How It Works
 
