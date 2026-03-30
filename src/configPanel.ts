@@ -195,7 +195,21 @@ providers.forEach((p, i) => {
 
 function onProviderChange() {
   const p = providers[providerSel.value];
-  document.getElementById('apiBaseUrl').value = p.baseUrl;
+  const urlInput = document.getElementById('apiBaseUrl');
+  const urlHint = urlInput.nextElementSibling;
+
+  if (p.name.startsWith('Anthropic')) {
+    urlInput.value = '';
+    urlInput.placeholder = 'Enter your proxy URL (Anthropic native API is not OpenAI-compatible)';
+    urlHint.textContent = '⚠️ Anthropic native API does NOT support OpenAI format. Use OpenRouter, or a proxy like one-api.';
+  } else if (p.name === 'Custom') {
+    urlInput.value = '';
+    urlInput.placeholder = 'https://your-proxy.com/v1';
+    urlHint.textContent = 'Enter your OpenAI-compatible endpoint URL';
+  } else {
+    urlInput.value = p.baseUrl;
+    urlHint.textContent = 'Auto-filled by provider. Edit to use a proxy or custom endpoint.';
+  }
   // Build model list
   const modelSel = document.getElementById('presetModel');
   modelSel.innerHTML = '';

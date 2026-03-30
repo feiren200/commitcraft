@@ -35,14 +35,15 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "commitCraft.configure"
+        }
+      ],
       "scm/title": [
         {
           "command": "commitCraft.generate",
-          "group": "inline@1"
-        },
-        {
-          "command": "commitCraft.configure",
-          "group": "inline@2"
+          "group": "navigation"
         }
       ]
     },
