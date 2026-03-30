@@ -1,0 +1,129 @@
+{
+  "name": "commitcraft",
+  "displayName": "CommitCraft",
+  "description": "Generate git commit messages with AI — supports any OpenAI-compatible API and proxy",
+  "version": "0.1.0",
+  "publisher": "commitcraft",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/feiren200/commitcraft.git"
+  },
+  "bugs": {
+    "url": "https://github.com/feiren200/commitcraft/issues"
+  },
+  "homepage": "https://github.com/feiren200/commitcraft#readme",
+
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "SCM Providers"],
+  "keywords": ["git", "commit", "ai", "llm", "openai"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "commitCraft.generate",
+        "title": "CommitCraft: Generate Commit Message",
+        "icon": "$(sparkle)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "commitCraft.generate",
+          "when": "scmProvider == git",
+          "group": "inline@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CommitCraft",
+      "properties": {
+        "commitCraft.apiBaseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "markdownDescription": "API Base URL (OpenAI-compatible). Examples:\n- OpenAI: `https://api.openai.com/v1`\n- DeepSeek: `https://api.deepseek.com/v1`\n- Any proxy: `https://your-proxy.com/v1`"
+        },
+        "commitCraft.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API Key"
+        },
+        "commitCraft.presetModel": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "enum": [
+            "gpt-4o",
+            "gpt-4o-mini",
+            "o3-mini",
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-20250514",
+            "claude-3-5-haiku-20241022",
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "deepseek-chat",
+            "deepseek-reasoner",
+            "moonshot-v1-8k",
+            "glm-4-plus",
+            "qwen-plus"
+          ],
+          "enumDescriptions": [
+            "OpenAI GPT-4o",
+            "OpenAI GPT-4o Mini (fast, cheap)",
+            "OpenAI o3-mini (reasoning)",
+            "Anthropic Claude Sonnet 4 (via proxy)",
+            "Anthropic Claude Opus 4 (via proxy)",
+            "Anthropic Claude 3.5 Haiku (via proxy)",
+            "Google Gemini 2.5 Flash",
+            "Google Gemini 2.5 Pro",
+            "DeepSeek V3",
+            "DeepSeek R1 (reasoning)",
+            "Moonshot Kimi 8K",
+            "Zhipu GLM-4 Plus",
+            "Alibaba Tongyi Qwen Plus"
+          ],
+          "description": "Preset model selection. Set customModel to use a different model."
+        },
+        "commitCraft.customModel": {
+          "type": "string",
+          "default": "",
+          "description": "Custom model name (overrides presetModel if set). Use for models not in the preset list or OpenRouter models like 'anthropic/claude-sonnet-4'."
+        },
+        "commitCraft.language": {
+          "type": "string",
+          "default": "English",
+          "enum": ["English", "中文", "日本語", "한국어", "Français", "Deutsch", "Español"],
+          "description": "Commit message language"
+        },
+        "commitCraft.style": {
+          "type": "string",
+          "default": "conventional",
+          "enum": ["conventional", "simple", "emoji"],
+          "description": "Commit style: conventional (feat/fix/...), simple (plain), emoji (🔧/🐛/...)"
+        },
+        "commitCraft.detail": {
+          "type": "string",
+          "default": "concise",
+          "enum": ["concise", "detailed"],
+          "description": "Detail level"
+        },
+        "commitCraft.maxDiffLength": {
+          "type": "number",
+          "default": 8000,
+          "description": "Max diff chars sent to model"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

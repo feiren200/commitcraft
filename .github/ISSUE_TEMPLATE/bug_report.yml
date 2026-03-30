@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill in the details below.
+
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VSCode Version
+      placeholder: "e.g. 1.96.0"
+    validations:
+      required: true
+
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension Version
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: api-provider
+    attributes:
+      label: API Provider
+      options:
+        - OpenAI
+        - DeepSeek
+        - Moonshot (Kimi)
+        - Zhipu (GLM)
+        - Tongyi Qianwen
+        - Other proxy
+        - Self-hosted
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: "e.g. gpt-4o-mini, deepseek-chat"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message (if any)
+      render: text
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+    validations:
+      required: true
