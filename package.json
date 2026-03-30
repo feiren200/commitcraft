@@ -1,9 +1,9 @@
 {
-  "name": "commitcraft",
-  "displayName": "CommitCraft",
+  "name": "ai-commit-craft",
+  "displayName": "AI Commit Craft",
   "description": "Generate git commit messages with AI — supports any OpenAI-compatible API and proxy",
   "version": "0.1.0",
-  "publisher": "commitcraft",
+  "publisher": "feiren200",
   "license": "MIT",
   "repository": {
     "type": "git",
