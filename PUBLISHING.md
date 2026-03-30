@@ -5,6 +5,7 @@
 1. Create a [Visual Studio Marketplace publisher](https://marketplace.visualstudio.com/manage)
 2. Get a Personal Access Token (PAT) from Azure DevOps
 3. Install vsce: `npm install -g @vscode/vsce`
+   123
 
 ## Steps
 
@@ -15,6 +16,7 @@
 5. Publish: `vsce publish`
 
 Or package first to test:
+
 ```bash
 vsce package
 # Install the .vsix locally to test

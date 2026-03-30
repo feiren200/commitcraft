@@ -99,6 +99,29 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
   hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   .section { font-size: 0.95em; font-weight: 600; margin-bottom: 10px; }
   .url-override { margin-top: 6px; }
+  .preview-box {
+    background: var(--vscode-textBlockQuote-background, rgba(0,0,0,0.15));
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+  }
+  .preview-label {
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--hint);
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .preview-text {
+    margin: 0;
+    font-family: var(--vscode-editor-font-family);
+    font-size: 0.88em;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    color: var(--fg);
+  }
 </style>
 </head>
 <body>
@@ -144,7 +167,7 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
 
 <hr />
 
-<div class="section">📝 Commit Style</div>
+<div class="section">📝 Commit Message Format</div>
 
 <div class="row">
   <div class="field">
@@ -154,25 +177,33 @@ function getWebviewContent(config: vscode.WorkspaceConfiguration): string {
     </select>
   </div>
   <div class="field">
-    <label>Style</label>
-    <select id="style">
-      ${selOpt('conventional', style)}
-      ${selOpt('simple', style)}
-      ${selOpt('emoji', style)}
+    <label>Message Format</label>
+    <select id="style" onchange="updatePreview()">
+      <option value="conventional"${style === 'conventional' ? ' selected' : ''}>Conventional (feat/fix/...)</option>
+      <option value="simple"${style === 'simple' ? ' selected' : ''}>Natural Language</option>
+      <option value="emoji"${style === 'emoji' ? ' selected' : ''}>Emoji Prefix (🔧/✨/...)</option>
     </select>
+    <div class="hint">How the commit message is structured</div>
   </div>
   <div class="field">
-    <label>Detail</label>
-    <select id="detail">
-      ${selOpt('concise', detail)}
-      ${selOpt('detailed', detail)}
+    <label>Message Length</label>
+    <select id="detail" onchange="updatePreview()">
+      <option value="concise"${detail === 'concise' ? ' selected' : ''}>One-line summary</option>
+      <option value="detailed"${detail === 'detailed' ? ' selected' : ''}>Summary + body</option>
     </select>
+    <div class="hint">Short title vs. detailed description</div>
   </div>
+</div>
+
+<div class="preview-box">
+  <div class="preview-label">Preview</div>
+  <pre id="preview" class="preview-text"></pre>
 </div>
 
 <div class="field">
   <label>Max Diff Length</label>
   <input id="maxDiffLength" type="number" value="${maxDiffLength}" min="1000" max="50000" step="1000" />
+  <div class="hint">Characters sent to the model (truncated if exceeded)</div>
 </div>
 
 <button onclick="save()">💾 Save Settings</button>
@@ -234,6 +265,29 @@ function onProviderChange() {
 
 // Initialize
 onProviderChange();
+
+const PREVIEWS = {
+  conventional: {
+    concise: 'feat(auth): add login with Google OAuth',
+    detailed: 'feat(auth): add login with Google OAuth\n\nImplement Google OAuth2 login flow to replace\nemail/password auth. Updates the auth service\nand adds the OAuth callback handler.',
+  },
+  simple: {
+    concise: 'Add Google OAuth login',
+    detailed: 'Add Google OAuth login\n\nImplement Google OAuth2 login flow to replace\nemail/password auth. Updates the auth service\nand adds the OAuth callback handler.',
+  },
+  emoji: {
+    concise: '✨ Add Google OAuth login',
+    detailed: '✨ Add Google OAuth login\n\nImplement Google OAuth2 login flow to replace\nemail/password auth. Updates the auth service\nand adds the OAuth callback handler.',
+  },
+};
+
+function updatePreview() {
+  const s = document.getElementById('style').value;
+  const d = document.getElementById('detail').value;
+  const preview = PREVIEWS[s]?.[d] || '';
+  document.getElementById('preview').textContent = preview;
+}
+updatePreview();
 
 // If we have a custom model, try to select it or show it
 if (currentCustomModel) {
