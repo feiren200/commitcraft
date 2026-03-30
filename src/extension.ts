@@ -1,16 +1,21 @@
 import * as vscode from 'vscode';
 import { getGitDiff, setCommitMessage } from './git';
 import { generateCommitMessage } from './llm';
+import { registerConfigPanel } from './configPanel';
 
 export function activate(context: vscode.ExtensionContext) {
-  const disposable = vscode.commands.registerCommand(
+  // Generate command
+  const generateCmd = vscode.commands.registerCommand(
     'commitCraft.generate',
     async () => {
       await handleGenerate();
     }
   );
 
-  context.subscriptions.push(disposable);
+  // Configuration panel command
+  const configCmd = registerConfigPanel(context);
+
+  context.subscriptions.push(generateCmd, configCmd);
 }
 
 function resolveModel(config: vscode.WorkspaceConfiguration): string {
@@ -33,10 +38,7 @@ async function handleGenerate(): Promise<void> {
       'Open Settings'
     );
     if (action === 'Open Settings') {
-      await vscode.commands.executeCommand(
-        'workbench.action.openSettings',
-        'commitCraft.apiBaseUrl'
-      );
+      await vscode.commands.executeCommand('commitCraft.configure');
     }
     return;
   }

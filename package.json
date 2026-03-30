@@ -27,6 +27,11 @@
         "command": "commitCraft.generate",
         "title": "CommitCraft: Generate Commit Message",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "commitCraft.configure",
+        "title": "CommitCraft: Open Settings",
+        "icon": "$(settings-gear)"
       }
     ],
     "menus": {
@@ -35,6 +40,11 @@
           "command": "commitCraft.generate",
           "when": "scmProvider == git",
           "group": "inline@1"
+        },
+        {
+          "command": "commitCraft.configure",
+          "when": "scmProvider == git",
+          "group": "inline@2"
         }
       ]
     },
