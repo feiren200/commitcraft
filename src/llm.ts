@@ -7,9 +7,58 @@ interface CompletionResponse {
 }
 
 /**
+ * Extract changed file info from diff for richer context.
+ */
+function extractFileInfo(diff: string): string {
+  const fileHeaders = diff.match(/^diff --git .+$/gm) || [];
+  const files = fileHeaders.map(h => {
+    const match = h.match(/^diff --git a\/(.+?) b\/(.+)$/);
+    return match ? match[2] : '';
+  }).filter(Boolean);
+
+  if (files.length === 0) return '';
+
+  const lines = diff.split('\n');
+  let added = 0, removed = 0;
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) added++;
+    if (line.startsWith('-') && !line.startsWith('---')) removed++;
+  }
+
+  const fileSummary = files.map(f => {
+    // Extract per-file stats
+    const fileDiff = extractFileDiff(diff, f);
+    const fileAdded = (fileDiff.match(/^\+[^+]/gm) || []).length;
+    const fileRemoved = (fileDiff.match(/^-[^-]/gm) || []).length;
+    const isNew = fileDiff.includes('new file mode');
+    const isDeleted = fileDiff.includes('deleted file mode');
+    let status = 'modified';
+    if (isNew) status = 'new file';
+    if (isDeleted) status = 'deleted';
+    return `  ${f} (${status}, +${fileAdded}/-${fileRemoved})`;
+  }).join('\n');
+
+  return `Changed files (${files.length} files, +${added}/-${removed} lines):
+${fileSummary}`;
+}
+
+function extractFileDiff(diff: string, filePath: string): string {
+  const pattern = new RegExp(`^diff --git a/.+? b/${escapeRegex(filePath)}$`, 'm');
+  const start = diff.search(pattern);
+  if (start === -1) return '';
+
+  const afterStart = diff.substring(start);
+  // Find the next diff --git or end of string
+  const nextDiff = afterStart.indexOf('\ndiff --git ', 1);
+  return nextDiff === -1 ? afterStart : afterStart.substring(0, nextDiff);
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Call an OpenAI-compatible chat completions endpoint.
- * Works with: OpenAI, DeepSeek, Azure (with correct base URL),
- * any proxy that follows the /chat/completions convention.
  */
 export async function generateCommitMessage(
   diff: string,
@@ -23,6 +72,9 @@ export async function generateCommitMessage(
     maxDiffLength: number;
   }
 ): Promise<string> {
+  // Extract file info before truncating
+  const fileInfo = extractFileInfo(diff);
+
   // Truncate diff if too long
   let diffToSend = diff;
   if (diff.length > config.maxDiffLength) {
@@ -32,9 +84,9 @@ export async function generateCommitMessage(
   }
 
   const systemPrompt = buildSystemPrompt(config);
-  const userPrompt = `Here is the git diff:\n\n\`\`\`diff\n${diffToSend}\n\`\`\``;
+  const userPrompt = buildUserPrompt(diffToSend, fileInfo);
 
-  // Normalize base URL: strip trailing slash and /chat/completions if present
+  // Normalize base URL
   let baseUrl = config.apiBaseUrl.replace(/\/+$/, '');
   baseUrl = baseUrl.replace(/\/chat\/completions$/, '');
 
@@ -87,10 +139,8 @@ export async function generateCommitMessage(
 
   let message = data.choices[0].message.content?.trim() || '';
 
-  // Remove surrounding quotes if the model added them
+  // Clean up common model output artifacts
   message = message.replace(/^["']|["']$/g, '');
-
-  // Remove markdown code block wrapper if present
   message = message.replace(/^```(?:\w*\n)?([\s\S]*?)```$/, '$1').trim();
 
   // Post-process to enforce format
@@ -99,9 +149,17 @@ export async function generateCommitMessage(
   return message;
 }
 
+function buildUserPrompt(diff: string, fileInfo: string): string {
+  let prompt = '';
+  if (fileInfo) {
+    prompt += `${fileInfo}\n\n`;
+  }
+  prompt += `Git diff:\n\n\`\`\`diff\n${diff}\n\`\`\``;
+  return prompt;
+}
+
 /**
  * Post-process commit message to enforce the selected style.
- * Models don't always follow format instructions, so we enforce it here.
  */
 function enforceFormat(message: string, style: string): string {
   if (!message) return message;
@@ -110,25 +168,20 @@ function enforceFormat(message: string, style: string): string {
 
   switch (style) {
     case 'conventional': {
-      // Check if already has conventional prefix: type(scope): or type:
       if (/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:\s/.test(firstLine)) {
-        return message; // Already formatted
+        return message;
       }
-      // Try to detect type from content
       const type = detectConventionalType(message);
       return `${type}: ${message}`;
     }
     case 'emoji': {
-      // Check if already starts with an emoji
       if (/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(firstLine)) {
         return message;
       }
-      // Detect type and prepend emoji
       const emoji = detectEmoji(message);
       return `${emoji} ${message}`;
     }
     case 'simple': {
-      // Strip any conventional prefix or emoji that leaked through
       let clean = message.replace(/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:\s*/i, '');
       clean = clean.replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}]\s*/u, '');
       return clean;
@@ -172,43 +225,88 @@ function buildSystemPrompt(config: {
   detail: string;
 }): string {
   const lang = config.language;
-  const detail =
-    config.detail === 'detailed'
-      ? 'Write a detailed commit message with a short summary line followed by a body that explains WHY and WHAT changed.'
-      : 'Write a concise one-line commit message.';
 
-  let styleGuide = '';
+  let detailGuide: string;
+  if (config.detail === 'detailed') {
+    detailGuide = `Write a detailed commit message:
+- First line: a concise summary of WHAT changed (max 72 chars)
+- Blank line
+- Body: explain WHY this change was made and WHAT the impact is
+- Focus on the motivation and context, not just restating the diff`;
+  } else {
+    detailGuide = `Write a concise one-line commit message (max 72 chars).
+Focus on WHAT changed and WHY, not just the file names.`;
+  }
+
+  let styleGuide: string;
   switch (config.style) {
     case 'conventional':
       styleGuide = `Follow the Conventional Commits format:
-- Prefix with a type: feat, fix, refactor, docs, style, test, chore, perf, ci, build
-- Use scope in parentheses when relevant: feat(auth): ...
-- Format: <type>(<optional scope>): <description>
-Examples: "fix: resolve null pointer in auth flow", "feat(api): add user search endpoint"`;
+- Prefix with a type based on the nature of the change:
+  • feat: new feature or capability for the user
+  • fix: bug fix
+  • refactor: code restructuring without changing behavior
+  • docs: documentation only
+  • style: formatting, whitespace, missing semicolons
+  • test: adding or updating tests
+  • perf: performance improvement
+  • ci: CI/CD configuration
+  • build: build system or dependencies
+  • chore: maintenance tasks
+- Add scope in parentheses when it clarifies: feat(auth): ...
+- Format: <type>(<scope>): <description>
+
+Good examples:
+  feat(auth): add Google OAuth login support
+  fix: resolve race condition in WebSocket reconnection
+  refactor(api): extract validation logic into middleware
+  perf(db): add index on users.email column`;
       break;
     case 'simple':
-      styleGuide = `Write in plain natural language. No prefix required.
-Examples: "Add user search endpoint", "Fix null pointer in authentication"`;
+      styleGuide = `Write in plain natural language. Start with an action verb.
+No type prefix. No emoji prefix.
+
+Good examples:
+  Add Google OAuth login support
+  Fix race condition in WebSocket reconnection
+  Extract validation logic into API middleware
+  Add database index on users.email for faster lookups`;
       break;
     case 'emoji':
       styleGuide = `Start with an emoji that matches the change type:
-🔧 for fixes, ✨ for features, ♻️ for refactors, 📝 for docs, 🎨 for style, 🧪 for tests, ⚡ for perf, 🔨 for build, 👷 for CI
-Format: <emoji> <description>
-Examples: "✨ Add user search endpoint", "🔧 Fix null pointer in authentication"`;
+  ✨ new feature: "✨ Add Google OAuth login"
+  🐛 bug fix: "🐛 Fix WebSocket reconnection race condition"
+  ♻️ refactor: "♻️ Extract validation into middleware"
+  📝 docs: "📝 Update API documentation"
+  🎨 style: "🎨 Reformat with prettier"
+  🧪 test: "🧪 Add unit tests for auth service"
+  ⚡ perf: "⚡ Add index on users.email column"
+  🔨 build: "🔨 Update webpack to v5"
+  👷 ci: "👷 Add GitHub Actions workflow"
+
+Choose the emoji that BEST matches the primary change.`;
       break;
+    default:
+      styleGuide = '';
   }
 
-  return `You are a git commit message generator. Output ONLY the commit message, nothing else. No explanations, no quotes.
+  return `You are an expert software developer writing a git commit message.
 
-IMPORTANT: You MUST write the ENTIRE commit message in ${lang}. Every word must be in ${lang}. Do not use any English unless ${lang} is English.
+Analyze the diff carefully. Think about:
+1. WHAT files/components were changed
+2. WHY the developer made these changes (intent, motivation)
+3. WHAT the impact or effect of the change is
+
+Then write a commit message that captures the ESSENCE of the change.
+Do NOT just describe file-level changes like "modify auth.ts". Instead,
+describe the meaningful change: "Add login timeout to prevent session hijacking".
+
+IMPORTANT: Write the ENTIRE commit message in ${lang}.
+Do not use any other language unless ${lang} is English.
 
 ${styleGuide}
 
-${detail}
+${detailGuide}
 
-Rules:
-- Output ONLY the commit message text
-- Do NOT wrap in quotes or code blocks
-- Do NOT add "Here is the commit message:" or similar prefixes
-- Keep it actionable and descriptive`;
+Output ONLY the commit message. No explanations, no quotes, no code blocks.`;
 }
