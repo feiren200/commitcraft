@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-08-03
+
+### Fixed
+
+- Prevent empty commit messages when reasoning models exhaust their response budget
+- Validate API response content before writing to the Git SCM input box
+- Validate that the generated message is actually written to the Git SCM input box
+
+### Changed
+
+- Let the configured API provider choose the model's default output token budget
+
 ## [0.2.0] - 2026-03-31
 
 ### Changed

@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 
 interface CompletionResponse {
   choices: Array<{
-    message: { content: string };
+    finish_reason?: string;
+    message?: { content?: unknown; reasoning_content?: unknown };
   }>;
 }
 
@@ -107,7 +108,6 @@ export async function generateCommitMessage(
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.3,
-    max_tokens: 512,
   });
 
   let response: Response;
@@ -133,15 +133,37 @@ export async function generateCommitMessage(
 
   const data = (await response.json()) as CompletionResponse;
 
-  if (!data.choices || data.choices.length === 0) {
+  if (!data || !Array.isArray(data.choices) || data.choices.length === 0) {
     throw new Error('API returned no choices. Check your model name.');
   }
 
-  let message = data.choices[0].message.content?.trim() || '';
+  const choice = data.choices[0];
+  const content = choice?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    const reasoningContent = choice?.message?.reasoning_content;
+    const responseDetail = [
+      choice?.finish_reason ? `finish_reason=${choice.finish_reason}` : '',
+      typeof reasoningContent === 'string'
+        ? `reasoning_content_length=${reasoningContent.length}`
+        : '',
+    ].filter(Boolean).join(', ');
+    throw new Error(
+      `API returned an empty commit message${responseDetail ? ` (${responseDetail})` : ''}. ` +
+      'Try again or use a different model.'
+    );
+  }
+
+  let message = content.trim();
 
   // Clean up common model output artifacts
   message = message.replace(/^["']|["']$/g, '');
   message = message.replace(/^```(?:\w*\n)?([\s\S]*?)```$/, '$1').trim();
+
+  if (!message) {
+    throw new Error(
+      'API returned an empty commit message. Try again or use a different model.'
+    );
+  }
 
   // Post-process to enforce format
   message = enforceFormat(message, config.style);
